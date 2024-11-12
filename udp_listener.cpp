@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <fcntl.h>
 
-const char *IP_ADDRESS = "0.0.0.0";  // 监听所有网卡
+const char *INTERFACE = "eth0";  // 要绑定的网卡接口
 const int PORT = 4098;
 const int BUFFER_SIZE = 1508;
 
@@ -31,25 +31,26 @@ void udpListener() {
         return;
     }
 
-    // 设置接收超时
-    struct timeval tv;
-    tv.tv_sec = 5; // 5秒超时
-    tv.tv_usec = 0;
-    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof tv);
+    // 设置要绑定的网卡接口
+    if (setsockopt(sockfd, SOL_SOCKET, SO_BINDTODEVICE, INTERFACE, strlen(INTERFACE)) < 0) {
+        std::cerr << "Binding to device failed: " << strerror(errno) << "\n";
+        close(sockfd);
+        return;
+    }
 
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(PORT);
-    serverAddr.sin_addr.s_addr = inet_addr(IP_ADDRESS);
+    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY);  // 使用 INADDR_ANY 监听所有 IP 地址
 
-    // 绑定套接字到指定地址和端口
-    if (bind(sockfd, (const struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+    // 绑定套接字到指定端口
+    if (bind(sockfd, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
         std::cerr << "Socket bind failed: " << strerror(errno) << "\n";
         close(sockfd);
         return;
     }
 
-    std::cout << "Listening for UDP packets on " << IP_ADDRESS << ":" << PORT << "\n";
+    std::cout << "Listening for UDP packets on " << INTERFACE << " (all IPs) and port " << PORT << "\n";
 
     while (true) {
         struct sockaddr_in clientAddr;
